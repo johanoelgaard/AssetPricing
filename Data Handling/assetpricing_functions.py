@@ -5,10 +5,10 @@ import pandas as pd
 import os
 import re
 import gc
-import pandas as pd
 import orjson 
-from shapely.geometry import Polygon
 import plotly.graph_objects as go
+from shapely.geometry import Polygon
+import ast
 
 
 def dmi_api(base_url, period, parameter_id, api_key, limit=300000):
@@ -54,8 +54,8 @@ def dmi_api(base_url, period, parameter_id, api_key, limit=300000):
 
 # bulk loader function for every year
 def bulk_load_year(year, file_paths):
-    all_records = []
-    
+    aggregated_data = {}
+
     total_files = len(file_paths)
     processed_files = 0
 
@@ -87,22 +87,21 @@ def bulk_load_year(year, file_paths):
 
                         key = (cellId, from_time, to_time)
 
-                        # Build a record
-                        record = {
-                            'key': key,
-                            'cellId': cellId,
-                            'from': from_time,
-                            'to': to_time,
-                            parameterId: value
-                        }
+                        # Initialize or update the aggregated record
+                        if key not in aggregated_data:
+                            record = {
+                                'cellId': cellId,
+                                'from': from_time,
+                                'to': to_time,
+                                'geometry_type': geometry.get('type'),
+                                'coordinates': geometry.get('coordinates')
+                            }
+                            aggregated_data[key] = record
+                        else:
+                            record = aggregated_data[key]
 
-                        # Always add geometry
-                        record['geometry_type'] = geometry.get('type')
-                        coordinates = geometry.get('coordinates', [[]])
-                        flat_coords = coordinates[0] if coordinates else []
-                        record['coordinates'] = flat_coords
-
-                        all_records.append(record)
+                        # Update the record with the parameter value
+                        record[parameterId] = value
 
         except Exception as e:
             print(f"Error processing file {file_path}: {e}")
@@ -110,41 +109,25 @@ def bulk_load_year(year, file_paths):
         # Update the processed files counter
         processed_files += 1
 
-        # Print progress every 10 files
+        # Print progress every 100 files
         if processed_files % 100 == 0 or processed_files == total_files:
             print(f"Processed {processed_files}/{total_files} files for year {year}.")
 
-    if not all_records:
+    if not aggregated_data:
         print(f"No records were loaded for year {year}. Please check your data and filters.")
         return pd.DataFrame()  # Return an empty DataFrame
 
-    # Aggregate records by key
-    aggregated_data = {}
-    for record in all_records:
-        key = record.pop('key')
-        if key not in aggregated_data:
-            aggregated_data[key] = record
-        else:
-            # Update existing record with new parameterId and value
-            aggregated_data[key].update(record)
-
     # Convert the aggregated data into a DataFrame
-    df = pd.DataFrame(aggregated_data.values())
+    df = pd.DataFrame.from_dict(aggregated_data, orient='index')
 
     if df.empty:
         print(f"DataFrame is empty after aggregation for year {year}.")
         return df
 
-    # Optimize data types if 'cellId' exists
-    if 'cellId' in df.columns:
-        df['cellId'] = df['cellId'].astype('category')
-    else:
-        print(f"Warning: 'cellId' column is missing in the DataFrame for year {year}.")
-
-    if 'from' in df.columns:
-        df['from'] = pd.to_datetime(df['from'])
-    if 'to' in df.columns:
-        df['to'] = pd.to_datetime(df['to'])
+    # Optimize data types
+    df['cellId'] = df['cellId'].astype('category')
+    df['from'] = pd.to_datetime(df['from'])
+    df['to'] = pd.to_datetime(df['to'])
 
     return df
 
@@ -193,69 +176,75 @@ def process_all_years(folder_path, output_folder_path):
         del df_year
         gc.collect()
 
-def plot_polygons_from_df(df):
-    # Initialize a list to store the polygons and their properties
-    polygons = []
-    
-    # Iterate over the rows in the dataframe to convert coordinates to Polygons
-    for index, row in df.iterrows():
-        coordinates = row['coordinates']
-        
-        if coordinates:  # Ensure there are coordinates
-            try:
-                # Create a Shapely Polygon from the coordinates
-                polygon = Polygon(coordinates)
-                polygons.append(polygon)
-            except ValueError:
-                print(f"Invalid polygon at row {index}")
-                polygons.append(None)
-        else:
-            polygons.append(None)
+# Convert the coordinates from string to a list of tuples (Polygon format)
+def parse_coordinates(coord_str):
+    return [tuple(map(float, point)) for polygon in ast.literal_eval(coord_str) for point in polygon]
 
-    # Add the polygons as a geometry column to the DataFrame
-    df['geometry'] = polygons
+def plot_polygons(df, color_by=None, save=None):
+    df['parsed_coordinates'] = df['coordinates'].apply(parse_coordinates)
 
-    # Drop duplicate polygons to avoid plotting them multiple times
-    df_unique = df.drop_duplicates(subset=['geometry'])
+    if color_by and color_by in df.columns:
+        # If a categorical column is specified, use it for color grouping
+        df['color_category'] = df[color_by].astype('category').cat.codes
+    else:
+        # Default to using the last two digits of the cellId
+        df['color_category'] = df['cellId'].apply(lambda x: int(x[-2:]))
 
-    # Extract coordinates in Plotly compatible format (lon, lat for each polygon)
+    # Normalize the color categories (you can scale them if needed)
+    min_color = df['color_category'].min()
+    max_color = df['color_category'].max()
+
+    # Create polygons and extract x, y coordinates for each square
     fig = go.Figure()
 
-    for i, row in df_unique.iterrows():
-        polygon_coords = row['coordinates']
-        if polygon_coords:
-            # Extract the longitude and latitude from the polygon coordinates
-            lons, lats = zip(*polygon_coords)
+    for _, row in df.iterrows():
+        polygon = Polygon(row['parsed_coordinates'])
+        x, y = polygon.exterior.xy
 
-            # Close the polygon by repeating the first point at the end
-            lons = list(lons) + [lons[0]]
-            lats = list(lats) + [lats[0]]
+        # Convert array.array to list
+        x = list(x)
+        y = list(y)
 
-            # Add the polygon to the Plotly map
-            fig.add_trace(go.Scattermapbox(
-                fill="toself",
-                lon=lons,
-                lat=lats,
-                mode="lines",
-                line=dict(width=1),
-                name=row['cellId'],  # Show the parameter ID in the legend
-                text=f"Value: {row['value']} Date: {row['from']}",  # Add value as hover info
-                hoverinfo="text"
-            ))
+        # Normalize color based on the chosen method (either category or cellId)
+        normalized_color = (row['color_category'] - min_color) / (max_color - min_color)
 
-    # Set up the layout for Plotly Mapbox
+        # Use Plotly's colorscale for colors
+        color = f'rgba({int(255 * normalized_color)}, {int(150 * (1 - normalized_color))}, {255-int(255 * normalized_color)}, 0.7)'  # Example using a gradient
+
+        hover_text = f"Cell ID: {row['cellId']}<br>Area: {row['area']}"
+
+        fig.add_trace(go.Scattermapbox(
+            lon=x,
+            lat=y,
+            fill="toself",
+            name=row['cellId'],
+            hovertext=hover_text,
+            hoverinfo="text",
+            mode='lines',
+            fillcolor=color,
+            line=dict(width=1, color='grey')  # Set line color to a subtle grey
+        ))
+
+    # Update layout for better visualization and adjusted starting view
     fig.update_layout(
-        mapbox_style="carto-positron",  # You can also use "carto-positron", "satellite" etc.
-        mapbox_zoom=5,  # Adjust zoom level
-        mapbox_center={"lat": 55.0, "lon": 9.5},  # Adjust the center based on your data
+        mapbox_style="carto-positron",  # You can also use "satellite", etc.
+        mapbox_zoom=5.8,  # Zoom out slightly to fit all of Denmark
+        mapbox_center={"lat": 56.0, "lon": 11.0},  # Adjust center to better fit the map (shift north slightly)
         height=600,
         margin={"r":0,"t":0,"l":0,"b":0},
-        showlegend=True
+        showlegend=False,
     )
 
-    # Show the figure
-    fig.show()
+    # If a save name is provided, save the figure as a PNG
+    if save:
+        output_dir = "output"
+        os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+        save_path = os.path.join(output_dir, save)
+        fig.write_image(save_path, width=700, height=600, scale=3)
+        print(f"Map saved as: {save_path}")
 
+    # Show the plot
+    fig.show()
 
 def get_energydata(url: str, params: dict):
     res = requests.get(url=url, params=params)
