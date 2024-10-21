@@ -1,5 +1,4 @@
 # functions created for seminar in Asset Pricing and Financial Markets at the University of Copenhagen, Fall 2024
-
 import requests
 import pandas as pd
 import os
@@ -52,8 +51,7 @@ def dmi_api(base_url, period, parameter_id, api_key, limit=300000):
     return all_data
 
 
-# bulk loader function for every year
-def bulk_load_year(year, file_paths):
+def bulk_load_year(year, file_paths, id_fields):
     aggregated_data = {}
 
     total_files = len(file_paths)
@@ -75,27 +73,30 @@ def bulk_load_year(year, file_paths):
                         if properties.get('timeResolution') != 'hour':
                             continue
 
-                        cellId = properties.get('cellId')
+                        # Extract ID fields
+                        id_values = tuple(properties.get(id_field) for id_field in id_fields)
                         from_time = properties.get('from')
                         to_time = properties.get('to')
                         parameterId = properties.get('parameterId')
                         value = properties.get('value')
 
                         # Skip records with missing critical data
-                        if None in (cellId, from_time, to_time, parameterId, value):
+                        if None in id_values or None in (from_time, to_time, parameterId, value):
                             continue
 
-                        key = (cellId, from_time, to_time)
+                        # Build the key
+                        key = id_values + (from_time, to_time)
 
                         # Initialize or update the aggregated record
                         if key not in aggregated_data:
-                            record = {
-                                'cellId': cellId,
+                            # Build the record
+                            record = {id_field: id_value for id_field, id_value in zip(id_fields, id_values)}
+                            record.update({
                                 'from': from_time,
                                 'to': to_time,
                                 'geometry_type': geometry.get('type'),
                                 'coordinates': geometry.get('coordinates')
-                            }
+                            })
                             aggregated_data[key] = record
                         else:
                             record = aggregated_data[key]
@@ -125,7 +126,8 @@ def bulk_load_year(year, file_paths):
         return df
 
     # Optimize data types
-    df['cellId'] = df['cellId'].astype('category')
+    for id_field in id_fields:
+        df[id_field] = df[id_field].astype('category')
     df['from'] = pd.to_datetime(df['from'])
     df['to'] = pd.to_datetime(df['to'])
 
@@ -133,7 +135,7 @@ def bulk_load_year(year, file_paths):
 
 
 # function to process all in a folder
-def process_all_years(folder_path, output_folder_path):
+def process_all_years(folder_path, output_folder_path, id_fields):
     # Ensure the output folder exists
     os.makedirs(output_folder_path, exist_ok=True)
 
@@ -159,7 +161,7 @@ def process_all_years(folder_path, output_folder_path):
     # Process files for each year
     for year in sorted(year_to_files.keys()):
         files_for_year = year_to_files[year]
-        df_year = bulk_load_year(year, files_for_year)
+        df_year = bulk_load_year(year, files_for_year, id_fields)
 
         if not df_year.empty:
             # Construct the output file path
