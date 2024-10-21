@@ -259,3 +259,10 @@ def get_energydata(url: str, params: dict):
     df = pd.DataFrame(records)
     
     return df
+
+
+def degrees_to_cardinal(degrees):
+    directions = ['N', 'NE',  'E', 'SE', 
+                  'S', 'SW', 'W', 'NW']
+    idx = round(degrees / 45) % 8
+    return directions[idx]
