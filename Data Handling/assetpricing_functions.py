@@ -6,7 +6,7 @@ import re
 import gc
 import orjson 
 import plotly.graph_objects as go
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 import ast
 
 
@@ -178,19 +178,27 @@ def process_all_years(folder_path, output_folder_path, id_fields):
         del df_year
         gc.collect()
 
-# Convert the coordinates from string to a list of tuples (Polygon format)
-def parse_coordinates(coord_str):
+# parse the coordinates from string
+def parse_poly(coord_str):
     return [tuple(map(float, point)) for polygon in ast.literal_eval(coord_str) for point in polygon]
 
-def plot_polygons(df, color_by=None, save=None):
-    df['parsed_coordinates'] = df['coordinates'].apply(parse_coordinates)
+def parse_point(coord_str):
+    return ast.literal_eval(coord_str)
 
+def plot_polygons(df, id, color_by=None, save=None):
+    # Parse the coordinates
+
+    # parse coordinates depending on the geometry type
+    if df['geometry_type'].iloc[0] == 'Polygon':
+        df['parsed_coordinates'] = df['coordinates'].apply(parse_poly)
+    else:
+        df['parsed_coordinates'] = df['coordinates'].apply(parse_point)
     if color_by and color_by in df.columns:
         # If a categorical column is specified, use it for color grouping
         df['color_category'] = df[color_by].astype('category').cat.codes
     else:
-        # Default to using the last two digits of the cellId
-        df['color_category'] = df['cellId'].apply(lambda x: int(x[-2:]))
+        # Default to using the last two digits of the id
+        df['color_category'] = df[color_by].apply(lambda x: int(x[-2:]))
 
     # Normalize the color categories (you can scale them if needed)
     min_color = df['color_category'].min()
@@ -200,32 +208,54 @@ def plot_polygons(df, color_by=None, save=None):
     fig = go.Figure()
 
     for _, row in df.iterrows():
-        polygon = Polygon(row['parsed_coordinates'])
-        x, y = polygon.exterior.xy
+        if row['geometry_type'] == 'Polygon':
+            polygon = Polygon(row['parsed_coordinates'])
+            x, y = polygon.exterior.xy
 
-        # Convert array.array to list
-        x = list(x)
-        y = list(y)
+            # Convert array.array to list
+            x = list(x)
+            y = list(y)
 
-        # Normalize color based on the chosen method (either category or cellId)
-        normalized_color = (row['color_category'] - min_color) / (max_color - min_color)
+            # Normalize color based on the chosen method (either category or id)
+            normalized_color = (row['color_category'] - min_color) / (max_color - min_color)
 
-        # Use Plotly's colorscale for colors
-        color = f'rgba({int(255 * normalized_color)}, {int(150 * (1 - normalized_color))}, {255-int(255 * normalized_color)}, 0.7)'  # Example using a gradient
+            # Use Plotly's colorscale for colors
+            color = f'rgba({int(255 * normalized_color)}, {int(150 * (1 - normalized_color))}, {255-int(255 * normalized_color)}, 0.7)'  # Example using a gradient
 
-        hover_text = f"Cell ID: {row['cellId']}<br>Area: {row['area']}"
+            hover_text = f"ID: {row[id]}<br>Area: {row['area']}"
 
-        fig.add_trace(go.Scattermapbox(
-            lon=x,
-            lat=y,
-            fill="toself",
-            name=row['cellId'],
-            hovertext=hover_text,
-            hoverinfo="text",
-            mode='lines',
-            fillcolor=color,
-            line=dict(width=1, color='grey')  # Set line color to a subtle grey
-        ))
+            fig.add_trace(go.Scattermapbox(
+                lon=x,
+                lat=y,
+                fill="toself",
+                name=row[id],
+                hovertext=hover_text,
+                hoverinfo="text",
+                mode='lines',
+                fillcolor=color,
+                line=dict(width=1, color='grey')  # Set line color to a subtle grey
+            ))
+        elif row['geometry_type'] == 'Point':
+            point = Point(row['parsed_coordinates'])
+            x, y = point.x, point.y
+
+            # Normalize color based on the chosen method (either category or id)
+            normalized_color = (row['color_category'] - min_color) / (max_color - min_color)
+
+            # Use Plotly's colorscale for colors
+            color = f'rgba({int(255 * normalized_color)}, {int(150 * (1 - normalized_color))}, {255-int(255 * normalized_color)}, 0.7)'  # Example using a gradient
+
+            hover_text = f"ID: {row[id]}<br>Area: {row['area']}"
+
+            fig.add_trace(go.Scattermapbox(
+                lon=[x],
+                lat=[y],
+                name=row[id],
+                hovertext=hover_text,
+                hoverinfo="text",
+                mode='markers',
+                marker=dict(size=10, color=color, opacity=0.7)
+            ))
 
     # Update layout for better visualization and adjusted starting view
     fig.update_layout(
