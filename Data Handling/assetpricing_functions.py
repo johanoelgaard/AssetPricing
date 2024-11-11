@@ -185,7 +185,7 @@ def parse_poly(coord_str):
 def parse_point(coord_str):
     return ast.literal_eval(coord_str)
 
-def plot_polygons(df, id, color_by=None, save=None):
+def plot_map(df, id, color_by=None, save=None, do_print=True):
     # Parse the coordinates
 
     # parse coordinates depending on the geometry type
@@ -276,7 +276,8 @@ def plot_polygons(df, id, color_by=None, save=None):
         print(f"Map saved as: {save_path}")
 
     # Show the plot
-    fig.show()
+    if do_print:
+        fig.show()
 
 def get_energydata(url: str, params: dict):
     res = requests.get(url=url, params=params)
