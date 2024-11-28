@@ -11,7 +11,7 @@ import numpy as np
 
 
 # create data class
-class ElectricityDataset(Dataset):
+class dataset(Dataset):
     def __init__(self, features, targets, seq_length=24):
         self.features = features
         self.targets = targets
@@ -26,9 +26,9 @@ class ElectricityDataset(Dataset):
         return torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
 
 # define neural network
-class PricePredictor(nn.Module):
+class LSTMmodel(nn.Module):
     def __init__(self, input_dim, hidden_dim, layer_dim, output_dim):
-        super(PricePredictor, self).__init__()
+        super(LSTMmodel, self).__init__()
         self.hidden_dim = hidden_dim
         self.layer_dim = layer_dim
 
