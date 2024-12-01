@@ -9,7 +9,6 @@ import matplotlib.dates as mdates
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import numpy as np
 
-
 # create data class
 class dataset(Dataset):
     def __init__(self, features, targets, seq_length=24):
@@ -35,7 +34,7 @@ class LSTMmodel(nn.Module):
         # LSTM layer
         self.lstm = nn.LSTM(input_dim, hidden_dim, layer_dim, batch_first=True)
 
-        # Fully connected layer
+        # fully connected output layer
         self.fc = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x):
@@ -55,3 +54,9 @@ class LSTMmodel(nn.Module):
 def l1_regularization(model, lambda_l1):
     l1_norm = sum(p.abs().sum() for p in model.parameters())
     return lambda_l1 * l1_norm
+
+# define function for cyclical encoding
+def cyclical_encoding(df, column, max_val):
+    df[column + '_sin'] = np.sin(2 * np.pi * df[column]/max_val)
+    df[column + '_cos'] = np.cos(2 * np.pi * df[column]/max_val)
+    return df
