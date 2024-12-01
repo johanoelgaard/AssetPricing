@@ -49,11 +49,14 @@ class LSTMmodel(nn.Module):
         out = self.fc(out[:, -1, :])
         return out
 
-
 # define function for L1 regularization
 def l1_regularization(model, lambda_l1):
     l1_norm = sum(p.abs().sum() for p in model.parameters())
     return lambda_l1 * l1_norm
+
+def l2_regularization(model, lambda_l2):
+    l2_norm = sum(p.pow(2).sum() for p in model.parameters())
+    return lambda_l2 * l2_norm
 
 # define function for cyclical encoding
 def cyclical_encoding(df, column, max_val):
