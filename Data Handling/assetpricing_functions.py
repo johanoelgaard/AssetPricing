@@ -293,7 +293,6 @@ def get_energydata(url: str, params: dict):
     
     return df
 
-
 def degrees_to_cardinal(degrees):
     directions = ['N', 'NE',  'E', 'SE', 
                   'S', 'SW', 'W', 'NW']
@@ -309,6 +308,13 @@ def pca_filtering(df, prefix, n_components=0.99):
     
     print(f"Reduced from {df.filter(like=prefix).shape[1]} to {pca.n_components_}, explained variance: {pca.explained_variance_ratio_.sum()}")    
     return df_n
+
+# define function for cyclical encoding
+def cyclical_encoding(df, column, max_val):
+    df[column + '_sin'] = np.sin(2 * np.pi * df[column]/max_val)
+    df[column + '_cos'] = np.cos(2 * np.pi * df[column]/max_val)
+    df.drop(column, axis=1, inplace=True)
+    return df
 
 def cyclical_wind_encoding(df, wind_col):
     if wind_col not in df.columns:
