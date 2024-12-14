@@ -8,6 +8,8 @@ import orjson
 import plotly.graph_objects as go
 from shapely.geometry import Polygon, Point
 import ast
+import numpy as np
+from sklearn.decomposition import PCA
 
 
 def dmi_api(base_url, period, parameter_id, api_key, limit=300000):
@@ -297,3 +299,23 @@ def degrees_to_cardinal(degrees):
                   'S', 'SW', 'W', 'NW']
     idx = round(degrees / 45) % 8
     return directions[idx]
+
+def pca_filtering(df, prefix, n_components=0.99):
+    pca = PCA(n_components=n_components, svd_solver='full')
+    
+    data_n = pca.fit_transform(df.filter(like=prefix))
+    pca_columns = [f"{prefix}pca_{i+1}" for i in range(pca.n_components_)]
+    df_n = pd.DataFrame(data_n, columns=pca_columns)
+    
+    print(f"Reduced from {df.filter(like=prefix).shape[1]} to {pca.n_components_}, explained variance: {pca.explained_variance_ratio_.sum()}")    
+    return df_n
+
+def cyclical_wind_encoding(df, wind_col):
+    if wind_col not in df.columns:
+        raise ValueError(f"Column '{wind_col}' not found in the DataFrame.")
+    
+    radians = np.deg2rad(df[wind_col])
+    df[wind_col + '_sin'] = np.sin(radians)
+    df[wind_col + '_cos'] = np.cos(radians)
+    
+    return df

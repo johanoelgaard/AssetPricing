@@ -11,7 +11,7 @@ import numpy as np
 
 # create data class
 class dataset(Dataset):
-    def __init__(self, features, targets, seq_length=24):
+    def __init__(self, features, targets, seq_length):
         self.features = features
         self.targets = targets
         self.seq_length = seq_length
