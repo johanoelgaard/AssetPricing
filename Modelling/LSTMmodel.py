@@ -57,9 +57,3 @@ def l1_regularization(model, lambda_l1):
 def l2_regularization(model, lambda_l2):
     l2_norm = sum(p.pow(2).sum() for p in model.parameters())
     return lambda_l2 * l2_norm
-
-# define function for cyclical encoding
-def cyclical_encoding(df, column, max_val):
-    df[column + '_sin'] = np.sin(2 * np.pi * df[column]/max_val)
-    df[column + '_cos'] = np.cos(2 * np.pi * df[column]/max_val)
-    return df
