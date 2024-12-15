@@ -1,17 +1,12 @@
-import pandas as pd
-import numpy as np
+
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import numpy as np
+
 
 # create data class
 class dataset(Dataset):
-    def __init__(self, features, targets, seq_length=24):
+    def __init__(self, features, targets, seq_length):
         self.features = features
         self.targets = targets
         self.seq_length = seq_length
@@ -57,9 +52,3 @@ def l1_regularization(model, lambda_l1):
 def l2_regularization(model, lambda_l2):
     l2_norm = sum(p.pow(2).sum() for p in model.parameters())
     return lambda_l2 * l2_norm
-
-# define function for cyclical encoding
-def cyclical_encoding(df, column, max_val):
-    df[column + '_sin'] = np.sin(2 * np.pi * df[column]/max_val)
-    df[column + '_cos'] = np.cos(2 * np.pi * df[column]/max_val)
-    return df
