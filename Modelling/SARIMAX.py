@@ -4,6 +4,7 @@ from math import pi
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+from arch import arch_model
 
 
 class DataLoader:
@@ -188,3 +189,27 @@ class SARIMAWrapper:
             forecast_value = self.forecast_one_step(current_time, current_exog)
             forecasts.append(forecast_value)
         return pd.Series(forecasts, index=forecast_index)
+
+
+
+class GARCHWrapper:
+    def __init__(self, p=1, q=1, dist='normal', mean='AR', lags=1):
+        self.p = p
+        self.q = q
+        self.dist = dist
+        self.mean = mean
+        self.lags = lags
+        self.model = None
+        self.results = None
+
+    def fit(self, returns):
+        self.model = arch_model(returns, mean=self.mean, lags=self.lags, vol='GARCH', p=self.p, q=self.q, dist=self.dist)
+        self.results = self.model.fit(disp='off')
+        return self.results
+
+    def forecast_one_step(self):
+        if self.results is None:
+            raise ValueError("Model must be fitted before forecasting.")
+        fc = self.results.forecast(horizon=1)
+        mean_fc = fc.mean.iloc[-1, 0]
+        return mean_fc
