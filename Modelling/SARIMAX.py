@@ -8,10 +8,11 @@ from arch import arch_model
 
 
 class DataLoader:
-    def __init__(self, file_path, use_temp=True, use_wind=True, use_oil=True, use_gas=True):
+    def __init__(self, file_path, use_temp_pca=True, use_wind_pca=True, use_fourier=True, use_oil=True, use_gas=True):
         self.file_path = file_path
-        self.use_temp = use_temp
-        self.use_wind = use_wind
+        self.use_temp_pca = use_temp_pca
+        self.use_wind_pca = use_wind_pca
+        self.use_fourier = use_fourier
         self.use_oil = use_oil
         self.use_gas = use_gas
 
@@ -20,6 +21,7 @@ class DataLoader:
         self.exog_data = None
 
     def load_data(self):
+        # Load and clean the data
         data = pd.read_csv(self.file_path)
         data['from'] = pd.to_datetime(data['from'], utc=True).dt.tz_localize(None)
         data.set_index('from', inplace=True)
@@ -27,127 +29,47 @@ class DataLoader:
         return self.data
 
     def preprocess_data(self):
+        # Spot price: No differencing, just forward-fill zeros and NaNs
         self.spot_price = self.data['SpotPriceDKK'].replace(0, np.nan).ffill().fillna(self.data['SpotPriceDKK'].mean())
 
+        # Build exogenous features dynamically
         exog_components = {}
 
-        # Temperature
-        if self.use_temp:
-            temp_cols = [col for col in self.data.columns if 'temp' in col]
-            if temp_cols:
-                temperature_data = self.data[temp_cols].ffill().fillna(self.data[temp_cols].mean())
-                avg_temp = temperature_data.mean(axis=1)
-                exog_components['avg_temp'] = avg_temp
+        # Temperature PCA components
+        if self.use_temp_pca:
+            temp_pca_cols = [col for col in self.data.columns if 'temp_pca' in col]
+            for col in temp_pca_cols:
+                exog_components[col] = self.data[col]
 
-        # Wind (if use_wind=True)
-        if self.use_wind:
-            # Same logic as before for wind direction and speed
-            direction_map = {
-               'N': 0,
-               'NE': np.pi/4,
-               'E': np.pi/2,
-               'SE': 3*np.pi/4,
-               'S': np.pi,
-               'SW': 5*np.pi/4,
-               'W': 3*np.pi/2,
-               'NW': 7*np.pi/4
-            }
+        # Wind Speed PCA components
+        if self.use_wind_pca:
+            wind_pca_cols = [col for col in self.data.columns if 'wind_speed_pca' in col]
+            for col in wind_pca_cols:
+                exog_components[col] = self.data[col]
 
-            wind_speed_cols = [col for col in self.data.columns if 'wind_speed_' in col]
-            wind_dir_cols = [col for col in self.data.columns if 'wind_dir_' in col]
+        # Fourier Features
+        if self.use_fourier:
+            fourier_cols = ['hour_sin', 'hour_cos', 'day_sin', 'day_cos', 'month_sin', 'month_cos']
+            for col in fourier_cols:
+                if col in self.data.columns:
+                    exog_components[col] = self.data[col]
 
-            if wind_speed_cols and wind_dir_cols:
-                # Fill missing
-                self.data[wind_speed_cols] = self.data[wind_speed_cols].ffill().fillna(self.data[wind_speed_cols].mean())
-                self.data[wind_dir_cols] = self.data[wind_dir_cols].ffill().fillna(False)
-                
-                municipalities = [col.split('wind_speed_')[-1] for col in wind_speed_cols]
-                wind_x_all = []
-                wind_y_all = []
-                
-                for muni in municipalities:
-                    muni_dir_cols = [c for c in wind_dir_cols if c.endswith('_' + muni)]
-                    muni_speed_col = 'wind_speed_' + muni
-
-                    directions_df = self.data[muni_dir_cols].astype(int)
-                    dir_matrix = directions_df.values
-                    true_count = dir_matrix.sum(axis=1)
-                    # Assuming one True per row
-                    direction_indices = dir_matrix.argmax(axis=1)
-                    chosen_dirs = [muni_dir_cols[i].split('wind_dir_')[1].split('_')[0] for i in direction_indices]
-                    angles = [direction_map[d] for d in chosen_dirs]
-                    speeds = self.data[muni_speed_col].values
-                    muni_wind_x = speeds * np.cos(angles)
-                    muni_wind_y = speeds * np.sin(angles)
-                    wind_x_all.append(muni_wind_x)
-                    wind_y_all.append(muni_wind_y)
-
-                if municipalities:
-                    wind_x_all = np.array(wind_x_all)
-                    wind_y_all = np.array(wind_y_all)
-                    avg_wind_x = wind_x_all.mean(axis=0)
-                    avg_wind_y = wind_y_all.mean(axis=0)
-                    exog_components['avg_wind_x'] = avg_wind_x
-                    exog_components['avg_wind_y'] = avg_wind_y
-
-        # Oil price
+        # Oil Price
         if self.use_oil and 'oil_price' in self.data.columns:
-            oil_price_data = self.data['oil_price'].ffill().fillna(self.data['oil_price'].mean())
-            exog_components['oil_price'] = oil_price_data
+            exog_components['oil_price'] = self.data['oil_price']
 
-        # Gas price
+        # Gas Price
         if self.use_gas and 'gas_price' in self.data.columns:
-            gas_price_data = self.data['gas_price'].ffill().fillna(self.data['gas_price'].mean())
-            exog_components['gas_price'] = gas_price_data
+            exog_components['gas_price'] = self.data['gas_price']
 
+        # Combine exogenous components
         self.exog_data = pd.DataFrame(exog_components, index=self.data.index)
+
+        # Ensure data alignment
         self.spot_price = self.spot_price.sort_index()
         self.exog_data = self.exog_data.sort_index()
+
         return self.spot_price, self.exog_data
-
-
-class FeatureEngineer:
-    def __init__(self, use_fourier=False, use_pca=False, pca_components=0.95):
-        self.use_fourier = use_fourier
-        self.use_pca = use_pca
-        self.pca_components = pca_components
-        self.scaler = None
-        self.pca = None
-
-    def add_fourier_terms(self, spot_price, exog_data):
-        if not self.use_fourier:
-            return exog_data
-        
-        hours_in_day = 24
-        hours_in_week = 24 * 7
-        hour_of_day = spot_price.index.hour
-        hour_of_week = spot_price.index.dayofweek * 24 + spot_price.index.hour
-
-        x_fourier = pd.DataFrame(index=spot_price.index)
-        x_fourier['sin_hourly'] = np.sin(2 * pi * hour_of_day / hours_in_day)
-        x_fourier['cos_hourly'] = np.cos(2 * pi * hour_of_day / hours_in_day)
-        x_fourier['sin_weekly'] = np.sin(2 * pi * hour_of_week / hours_in_week)
-        x_fourier['cos_weekly'] = np.cos(2 * pi * hour_of_week / hours_in_week)
-        x_fourier['time_trend'] = np.arange(len(x_fourier))
-
-        return pd.concat([exog_data, x_fourier], axis=1)
-
-    def apply_pca(self, exog_data):
-        if not self.use_pca:
-            return exog_data
-        self.scaler = StandardScaler()
-        scaled = self.scaler.fit_transform(exog_data)
-        self.pca = PCA(n_components=self.pca_components)
-        pca_features = self.pca.fit_transform(scaled)
-        return pd.DataFrame(pca_features, index=exog_data.index)
-
-    def transform(self, spot_price, exog_data):
-        # Add Fourier terms if requested
-        exog_data = self.add_fourier_terms(spot_price, exog_data)
-        # Apply PCA if requested
-        exog_data = self.apply_pca(exog_data)
-        return exog_data
-
 
 class SARIMAWrapper:
     def __init__(self, order, seasonal_order, enforce_stationarity=True, enforce_invertibility=True):
@@ -174,21 +96,116 @@ class SARIMAWrapper:
         forecast_result = self.results.get_forecast(steps=1, exog=exog_row)
         return forecast_result.predicted_mean.iloc[0]
 
-    def bulk_forecast(self, forecast_index, exog_features_reduced, use_past_24h=False):
+    def bulk_forecast(self, forecast_index, exog_features_reduced, actual_data):
         forecasts = []
-        for current_time in forecast_index:
-            if use_past_24h:
-                past_time = current_time - pd.Timedelta(hours=24)
-                if past_time not in exog_features_reduced.index:
-                    raise ValueError(f"No exogenous data for {past_time}.")
-                current_exog = exog_features_reduced.loc[[past_time]]
-            else:
-                # If not using past 24h logic, assume direct exog is available
-                current_exog = exog_features_reduced.loc[[current_time]]
+        last_model_time = self.results.model.data.orig_endog.index[-1]
 
-            forecast_value = self.forecast_one_step(current_time, current_exog)
+        for current_time in forecast_index:
+            # Check if we can update the model up to 24 hours before current_time
+            data_end_time = current_time - pd.Timedelta(hours=24)
+
+            if data_end_time > last_model_time:
+                new_data = actual_data.loc[(last_model_time + pd.Timedelta(hours=1)):data_end_time]
+
+                # If there's no new data to append, move on
+                if not new_data.empty:
+                    # Get corresponding exogenous data for the same time range
+                    # Make sure exog_features_reduced covers this period
+                    new_exog = exog_features_reduced.loc[new_data.index, self.results.model.data.orig_exog.columns]
+
+                    # Append both new_data and its corresponding exog data
+                    self.results = self.results.append(new_data, exog=new_exog, refit=False)
+                    last_model_time = data_end_time
+
+            # Always use exogenous data from 24 hours prior to current_time
+            past_time = current_time - pd.Timedelta(hours=24)
+            if past_time not in exog_features_reduced.index:
+                raise ValueError(f"No exogenous data available for {past_time}.")
+            current_exog = exog_features_reduced.loc[[past_time], self.results.model.data.orig_exog.columns]
+
+            # Forecast one step ahead at current_time
+            forecast_result = self.results.get_forecast(steps=1, exog=current_exog)
+            forecast_value = forecast_result.predicted_mean.iloc[0]
             forecasts.append(forecast_value)
+
         return pd.Series(forecasts, index=forecast_index)
+
+
+
+
+from statsmodels.tsa.arima.model import ARIMA
+import pandas as pd
+
+class ARIMAWrapper:
+    def __init__(self, order):
+        """
+        Initialize the ARIMA model wrapper.
+        
+        Parameters:
+        - order: tuple (p, d, q) for the ARIMA model.
+        """
+        self.order = order
+        self.model = None
+        self.results = None
+
+    def fit(self, train_data):
+        """
+        Fit the ARIMA model to the training data.
+        
+        Parameters:
+        - train_data: Training time series data.
+        """
+        self.model = ARIMA(train_data, order=self.order)
+        self.results = self.model.fit()
+        return self.results
+
+    def forecast_one_step(self):
+        """
+        Forecast one step ahead.
+        Returns the predicted mean for the next time step.
+        """
+        forecast_result = self.results.get_forecast(steps=1)
+        return forecast_result.predicted_mean.iloc[0]
+
+    def bulk_forecast(self, forecast_index):
+        """
+        Perform bulk forecasting for a given time index.
+
+        Parameters:
+        - forecast_index: pd.DatetimeIndex for the forecast period.
+
+        Returns:
+        - pd.Series of forecasted values.
+        """
+        forecasts = []
+        history = list(self.model.endog)  # Copy the training data into a list for updates
+
+        for current_time in forecast_index:
+            try:
+                # Convert history to a clean numeric array
+                clean_history = np.array(history, dtype=float)
+                
+                # Fit a temporary ARIMA model
+                temp_model = ARIMA(clean_history, order=self.order)
+                temp_results = temp_model.fit()
+                
+                # Forecast the next time step
+                forecast_value = temp_results.forecast(steps=1)[0]
+                forecasts.append(forecast_value)
+
+                # Update history with the forecasted value
+                history.append(forecast_value)
+
+            except Exception as e:
+                print(f"Error encountered at {current_time}: {e}")
+                forecasts.append(np.nan)
+
+
+        return pd.Series(forecasts, index=forecast_index)
+
+
+    
+
 
 
 
