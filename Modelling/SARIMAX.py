@@ -30,7 +30,7 @@ class DataLoader:
 
     def preprocess_data(self):
         # Spot price: No differencing, just forward-fill zeros and NaNs
-        self.spot_price = self.data['SpotPriceDKK'].replace(0, np.nan).ffill().fillna(self.data['SpotPriceDKK'].mean())
+        self.spot_price = self.data['SpotPrice']
 
         # Build exogenous features dynamically
         exog_components = {}
