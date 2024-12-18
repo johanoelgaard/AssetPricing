@@ -4,6 +4,8 @@ from torch.utils.data import Dataset
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from scipy.stats import t
+import numpy as np
 
 
 # create data class
@@ -127,24 +129,47 @@ def latex_table(models, metrics):
     Args:
     models (list of str): Names of the models (e.g., ['Naive', 'SARIMA', 'SARIMAX', 'LSTM']).
     metrics (dict): Dictionary with metric names as keys (e.g., 'RMSE', 'MAE') and 
-                    lists of metric values as values (e.g., {'RMSE': [123, 101, 95, 85], ...}).
+                    lists of metric values as values. For p-values, use tuples where the second
+                    value is the p-value (e.g., {'RMSE': [123, (101, 0.05), (95, 0.03), (85, 0.01)], ...}).
 
     Returns:
     str: A LaTeX table string in wide format.
     """
     # Start the table
-    table = "\\begin{tabular}{l" + "c" * len(models) + "}\n\\hline\hline\\\\[-1.8ex]\n"
-    
+    table = "\\begin{tabular}{l" + "c" * len(models) + "}\n\hline\hline \\\\ [-1.8ex]\n"
+
     # Add the header
-    table += " & " + " & ".join(models) + " \\\\\n\\hline\n"
-    
+    table += " & " + " & ".join(models) + " \\\\ \n \hline \n"
+
     # Add rows for each metric
     for metric, values in metrics.items():
-        table += f"{metric} & " + " & ".join(f"{value:.2f}" for value in values) + " \\\\\n"
-    
+        # Main metric values row
+        row = f"{metric} & "
+        row_values = []
+        for value in values:
+            if isinstance(value, tuple):  # If it's a tuple, extract the main value
+                main_value, _ = value
+                row_values.append(f"{main_value:.2f}")
+            else:
+                row_values.append(f"{value:.2f}")
+        row += " & ".join(row_values) + " \\\\ \n"
+        table += row
+
+        # P-values row
+        p_row = "" if metric.strip() == "" else " & "
+        p_values = []
+        for value in values:
+            if isinstance(value, tuple):  # If it's a tuple, extract the p-value
+                _, p_value = value
+                p_values.append(f"({p_value:.3f})")
+            else:
+                p_values.append("-")
+        p_row += " & ".join(p_values) + " \\\\ \n"
+        table += p_row
+
     # Close the table
-    table += "\\hline\hline\n\\end{tabular}"
-    
+    table += "\hline\hline\n\end{tabular}"
+
     return table
 
 def plot_forecasts(
@@ -156,7 +181,7 @@ def plot_forecasts(
     lstm_forecast, 
     start_datetime, 
     end_datetime, 
-    output_path="output/forecast_subplots.png",
+    output_path=None,
     display_plot=False
 ):
     """
@@ -171,7 +196,8 @@ def plot_forecasts(
     - lstm_forecast: pandas.Series or numpy.array of LSTM forecast values.
     - start_datetime: str, inclusive start datetime (e.g., "2024-08-01 00:00").
     - end_datetime: str, exclusive end datetime (e.g., "2024-08-10 00:00").
-    - output_path: str, path to save the output plot (default: "output/forecast_subplots.png").
+    - output_path: str, path to save the output plot (default: None).
+    - display_plot: bool, whether to display the plot (default: False).
     """
     # Ensure timestamps are datetime
     timestamps = pd.to_datetime(timestamps)
@@ -211,7 +237,9 @@ def plot_forecasts(
     plt.tight_layout()
 
     # Save and show the plot
-    plt.savefig(output_path)
+    if output_path:
+        plt.savefig(output_path)
+        print(f"Forecast plot saved to {output_path}")
     if display_plot:
         plt.show()
 
@@ -225,7 +253,7 @@ def plot_forecast_scatter(
     sarima_forecast,
     sarimax_forecast,
     lstm_forecast,
-    output_path="output/scatter_subplots.png",
+    output_path=None,
     display_plot=False
 ):
     """
@@ -237,10 +265,11 @@ def plot_forecast_scatter(
     - sarima_forecast: pandas.Series or numpy.array of SARIMA forecast values.
     - sarimax_forecast: pandas.Series or numpy.array of SARIMAX forecast values.
     - lstm_forecast: pandas.Series or numpy.array of LSTM forecast values.
-    - output_path: str, path to save the output plot (default: "output/scatter_subplots.png").
+    - output_path: str, path to save the output plot (default: None).
+    - display_plot: bool, whether to display the plot (default: False).
     """
     # Create a 2x2 grid of subplots
-    fig, axs = plt.subplots(2, 2, figsize=(20, 20))
+    fig, axs = plt.subplots(2, 2, figsize=(18, 18))
 
     # Define models and their labels
     models = [
@@ -267,8 +296,55 @@ def plot_forecast_scatter(
     plt.tight_layout()
 
     # Save and show the plot
-    plt.savefig(output_path)
+    if output_path:
+        plt.savefig(output_path)
+        print(f"Scatter plot saved to {output_path}")
     if display_plot:
         plt.show()
 
     plt.close()
+
+def diebold_mariano_test(actuals, forecast1, forecast2, loss_function='mse', h=1):
+    """
+    Performs the Diebold-Mariano test for predictive accuracy.
+
+    Parameters:
+        actuals (array): Actual observed values.
+        forecast1 (array): First forecast to compare.
+        forecast2 (array): Second forecast to compare.
+        loss_function (str): The loss function to use ('mse' or 'mae').
+        h (int): Forecast horizon, default is 1 (single-step forecast).
+
+    Returns:
+        DM statistic and p-value.
+    """
+    # Compute forecast errors
+    error1 = actuals - forecast1
+    error2 = actuals - forecast2
+
+    # Choose the loss function
+    if loss_function == 'mse':
+        diff = error1**2 - error2**2
+    elif loss_function == 'mae':
+        diff = np.abs(error1) - np.abs(error2)
+    else:
+        raise ValueError("Unsupported loss function. Use 'mse' or 'mae'.")
+
+    # Compute mean and variance of the loss differential
+    mean_diff = np.mean(diff)
+    n = len(diff)
+    variance_diff = np.var(diff, ddof=1)
+
+    # Correct variance for autocorrelation if h > 1
+    if h > 1:
+        autocov = np.correlate(diff, diff, mode='full') / n
+        variance_diff += 2 * sum(autocov[n-1:n-1+h])
+
+    # Compute DM statistic
+    dm_stat = mean_diff / np.sqrt(variance_diff / n)
+
+    # Compute p-value
+    dof = n - 1  # Degrees of freedom
+    p_value = 2 * (1 - t.cdf(abs(dm_stat), df=dof))  # Two-tailed test
+
+    return dm_stat, p_value
