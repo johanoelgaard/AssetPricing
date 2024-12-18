@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 # create data class
@@ -145,10 +147,6 @@ def latex_table(models, metrics):
     
     return table
 
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import pandas as pd
-
 def plot_forecasts(
     timestamps, 
     actuals, 
@@ -188,7 +186,7 @@ def plot_forecasts(
     filtered_lstm_forecast = lstm_forecast[mask]
 
     # Create a 2x2 grid of subplots
-    fig, axs = plt.subplots(2, 2, figsize=(28, 16))
+    fig, axs = plt.subplots(2, 2, figsize=(20, 12))
 
     # Define models and their labels/colors
     models = [
@@ -201,10 +199,10 @@ def plot_forecasts(
     # Plot each model on its own subplot
     for ax, (label, model, color) in zip(axs.flat, models):
         ax.plot(filtered_timestamps, filtered_actuals, label='Actual Prices', color='#1f77b4', alpha=0.8, linewidth=2.5)
-        ax.plot(filtered_timestamps, model, label=label, color=color, alpha=0.7,)
-        ax.set_ylabel('Spot Price (DKK per MWh)', fontsize=20)
-        ax.tick_params(axis='both', which='major', labelsize=16)
-        ax.legend(fontsize=16)
+        ax.plot(filtered_timestamps, model, label=label, color=color, alpha=0.7, linewidth=2.5)
+        ax.set_ylabel('Spot Price (DKK per MWh)', fontsize=24)
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        ax.legend(fontsize=20)
         ax.xaxis.set_major_locator(mdates.AutoDateLocator())
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
         ax.tick_params(axis='x', rotation=45)
@@ -216,3 +214,61 @@ def plot_forecasts(
     plt.savefig(output_path)
     if display_plot:
         plt.show()
+
+    plt.close()
+
+import matplotlib.pyplot as plt
+
+def plot_forecast_scatter(
+    actuals,
+    naive,
+    sarima_forecast,
+    sarimax_forecast,
+    lstm_forecast,
+    output_path="output/scatter_subplots.png",
+    display_plot=False
+):
+    """
+    Plots scatter plots of forecast models against actual values in a 2x2 grid.
+
+    Parameters:
+    - actuals: pandas.Series or numpy.array of actual values.
+    - naive: pandas.Series or numpy.array of naive forecast values.
+    - sarima_forecast: pandas.Series or numpy.array of SARIMA forecast values.
+    - sarimax_forecast: pandas.Series or numpy.array of SARIMAX forecast values.
+    - lstm_forecast: pandas.Series or numpy.array of LSTM forecast values.
+    - output_path: str, path to save the output plot (default: "output/scatter_subplots.png").
+    """
+    # Create a 2x2 grid of subplots
+    fig, axs = plt.subplots(2, 2, figsize=(20, 20))
+
+    # Define models and their labels
+    models = [
+        ("Naive Forecast", naive),
+        ("SARIMA Forecast", sarima_forecast),
+        ("LSTM Forecast", lstm_forecast),
+        ("SARIMAX Forecast", sarimax_forecast),
+    ]
+
+    # Determine the range for the diagonal reference line
+    min_price = min(actuals.min(), naive.min(), sarima_forecast.min(), sarimax_forecast.min(), lstm_forecast.min())
+    max_price = max(actuals.max(), naive.max(), sarima_forecast.max(), sarimax_forecast.max(), lstm_forecast.max())
+
+    # Plot each model on its own subplot
+    for ax, (label, forecast) in zip(axs.flat, models):
+        ax.scatter(actuals, forecast, alpha=0.5)
+        ax.plot([min_price, max_price], [min_price, max_price], 'k--', lw=2)  # Diagonal reference line
+        ax.set_xlabel('Actual Prices', fontsize=18)
+        ax.set_ylabel(label, fontsize=18)
+        ax.set_title(f'{label} vs Actual Prices', fontsize=20)
+        ax.tick_params(axis='both', which='major', labelsize=16)
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+    # Save and show the plot
+    plt.savefig(output_path)
+    if display_plot:
+        plt.show()
+
+    plt.close()
