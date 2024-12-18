@@ -190,7 +190,7 @@ def plot_forecasts(
     Parameters:
     - timestamps: pandas.Series or numpy.array of datetime values.
     - actuals: pandas.Series or numpy.array of actual values.
-    - naive: pandas.Series or numpy.array of naive forecast values.
+    - naive: pandas.Series or numpy.array of naïve forecast values.
     - sarima_forecast: pandas.Series or numpy.array of SARIMA forecast values.
     - sarimax_forecast: pandas.Series or numpy.array of SARIMAX forecast values.
     - lstm_forecast: pandas.Series or numpy.array of LSTM forecast values.
@@ -216,7 +216,7 @@ def plot_forecasts(
 
     # Define models and their labels/colors
     models = [
-    ("Naive Forecast", filtered_naive, '#ff7f0e'),
+    ("Naïve Forecast", filtered_naive, '#ff7f0e'),
     ("SARIMA Forecast", filtered_sarima_forecast, '#e377c2'),
     ("LSTM Forecast", filtered_lstm_forecast, '#d62728'),
     ("SARIMAX Forecast", filtered_sarimax_forecast, '#bcbd22'),
@@ -269,11 +269,11 @@ def plot_forecast_scatter(
     - display_plot: bool, whether to display the plot (default: False).
     """
     # Create a 2x2 grid of subplots
-    fig, axs = plt.subplots(2, 2, figsize=(18, 18))
+    fig, axs = plt.subplots(2, 2, figsize=(20, 20))
 
     # Define models and their labels
     models = [
-        ("Naive Forecast", naive),
+        ("Naïve Forecast", naive),
         ("SARIMA Forecast", sarima_forecast),
         ("LSTM Forecast", lstm_forecast),
         ("SARIMAX Forecast", sarimax_forecast),
@@ -287,10 +287,10 @@ def plot_forecast_scatter(
     for ax, (label, forecast) in zip(axs.flat, models):
         ax.scatter(actuals, forecast, alpha=0.5)
         ax.plot([min_price, max_price], [min_price, max_price], 'k--', lw=2)  # Diagonal reference line
-        ax.set_xlabel('Actual Prices', fontsize=18)
-        ax.set_ylabel(label, fontsize=18)
-        ax.set_title(f'{label} vs Actual Prices', fontsize=20)
-        ax.tick_params(axis='both', which='major', labelsize=16)
+        ax.set_xlabel('Actual Prices', fontsize=24)
+        ax.set_ylabel(label, fontsize=24)
+        ax.set_title(f'{label} vs Actual Prices', fontsize=26)
+        ax.tick_params(axis='both', which='major', labelsize=20)
 
     # Adjust layout to prevent overlap
     plt.tight_layout()
