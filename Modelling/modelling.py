@@ -10,6 +10,9 @@ import numpy as np
 
 # create data class
 class LSTMdataset(Dataset):
+    """ 
+    PyTorch Dataset class for LSTM model.
+    """
     def __init__(self, features, targets, seq_length):
         self.features = features
         self.targets = targets
@@ -25,6 +28,9 @@ class LSTMdataset(Dataset):
 
 # define neural network
 class LSTMmodel(nn.Module):
+    """
+    LSTM model for time series forecasting.
+    """
     def __init__(self, input_dim, hidden_dim, layer_dim, output_dim):
         super(LSTMmodel, self).__init__()
         self.hidden_dim = hidden_dim
@@ -50,14 +56,37 @@ class LSTMmodel(nn.Module):
 
 # define function for L1 regularization
 def l1_regularization(model, lambda_l1):
+    """
+    L1 regularization for PyTorch model.
+    
+    Args:
+    - model: PyTorch model.
+    - lambda_l1: L1 regularization parameter.
+    
+    Returns:
+    - L1 regularization loss.
+    """
     l1_norm = sum(p.abs().sum() for p in model.parameters())
     return lambda_l1 * l1_norm
 
 def l2_regularization(model, lambda_l2):
+    """
+    L2 regularization for PyTorch model.
+    
+    Args:
+    - model: PyTorch model.
+    - lambda_l2: L2 regularization parameter.
+    
+    Returns:
+    - L2 regularization loss.
+    """
     l2_norm = sum(p.pow(2).sum() for p in model.parameters())
     return lambda_l2 * l2_norm
 
 class SARIMADataLoader:
+    """
+    Data loader for SARIMA model.
+    """
     def __init__(self, file_path, use_temp_pca=True, use_wind_pca=True, use_fourier=True, use_oil=True, use_gas=True):
         self.file_path = file_path
         self.use_temp_pca = use_temp_pca
@@ -187,7 +216,7 @@ def plot_forecasts(
     """
     Plots forecast comparisons against actual values in four subplots.
 
-    Parameters:
+    Args:
     - timestamps: pandas.Series or numpy.array of datetime values.
     - actuals: pandas.Series or numpy.array of actual values.
     - naive: pandas.Series or numpy.array of naïve forecast values.
@@ -259,7 +288,7 @@ def plot_forecast_scatter(
     """
     Plots scatter plots of forecast models against actual values in a 2x2 grid.
 
-    Parameters:
+    Args:
     - actuals: pandas.Series or numpy.array of actual values.
     - naive: pandas.Series or numpy.array of naive forecast values.
     - sarima_forecast: pandas.Series or numpy.array of SARIMA forecast values.
@@ -308,7 +337,7 @@ def diebold_mariano_test(actuals, forecast1, forecast2, loss_function='mse', h=1
     """
     Performs the Diebold-Mariano test for predictive accuracy.
 
-    Parameters:
+    Args:
         actuals (array): Actual observed values.
         forecast1 (array): First forecast to compare.
         forecast2 (array): Second forecast to compare.

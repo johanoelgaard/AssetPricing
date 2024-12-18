@@ -13,6 +13,20 @@ from sklearn.decomposition import PCA
 
 
 def dmi_api(base_url, period, parameter_id, api_key, limit=300000):
+    """
+    Function to fetch data from the DMI API for a given parameter and period.
+
+    Args:
+    - base_url: The base URL for the API endpoint
+    - period: The period for which to fetch data (e.g., '2021-01-01T00:00:00Z/2021-01-02T00:00:00Z')
+    - parameter_id: The ID of the parameter to fetch (e.g., 'temperature')
+    - api_key: The API key to use for authentication
+    - limit: The maximum number of records to fetch in each request (default: 300000)
+
+    Returns:
+    - A list of dictionaries containing the fetched data
+    """
+
     offset = 0  # Start with no offset
     all_data = []  # List to collect all records
 
@@ -54,6 +68,18 @@ def dmi_api(base_url, period, parameter_id, api_key, limit=300000):
 
 
 def bulk_load_year(year, file_paths, id_fields):
+    """
+    Function to bulk load data for a specific year from a list of file paths.
+
+    Args:
+    - year: The year for which to load data
+    - file_paths: A list of file paths to load data from
+    - id_fields: A list of fields to use as IDs for the records
+
+    Returns:
+    - A DataFrame containing the aggregated data for the specified
+        year and ID fields, or an empty DataFrame if no data was loaded.
+        """
     aggregated_data = {}
 
     total_files = len(file_paths)
@@ -138,6 +164,19 @@ def bulk_load_year(year, file_paths, id_fields):
 
 # function to process all in a folder
 def process_all_years(folder_path, output_folder_path, id_fields):
+    """
+    Function to process all files in a folder and save the aggregated data to CSV files.
+
+    Args:
+    - folder_path: The path to the folder containing the input files
+    - output_folder_path: The path to the folder where the output CSV files should be saved
+    - id_fields: A list of fields to use as IDs for the records
+
+    Returns:
+    - None, but saves the aggregated data to CSV files in the specified output folder.
+
+    """
+
     # Ensure the output folder exists
     os.makedirs(output_folder_path, exist_ok=True)
 
@@ -182,14 +221,44 @@ def process_all_years(folder_path, output_folder_path, id_fields):
 
 # parse the coordinates from string
 def parse_poly(coord_str):
+    """
+    Function to parse a string of coordinates into a list of tuples.
+    
+    Args:
+    - coord_str: A string containing coordinates for a polygon.
+
+    Returns:
+    - A list of tuples containing the parsed coordinates.
+    """
+
     return [tuple(map(float, point)) for polygon in ast.literal_eval(coord_str) for point in polygon]
 
 def parse_point(coord_str):
+    """
+    Function to parse a string of coordinates into a tuple.
+
+    Parameters:
+    - coord_str: A string containing coordinates for a point.
+
+    Returns:
+    - A tuple containing the parsed coordinates.
+    """
     return ast.literal_eval(coord_str)
 
 def plot_map(df, id, color_by=None, save=None, do_print=True):
-    # Parse the coordinates
-
+    """ 
+    Function to plot a map of Denmark with the given data.
+    
+    Args:
+    - df: The DataFrame containing the data to plot.
+    - id: The name of the column containing the IDs for the data.
+    - color_by: The name of the column to use for coloring the data (optional).
+    - save: The name of the file to save the plot as (optional).
+    - do_print: Whether to print the plot (default: True).
+    
+    Returns:
+    - None, but shows the plot and optionally saves it to a file.
+    """
     # parse coordinates depending on the geometry type
     if df['geometry_type'].iloc[0] == 'Polygon':
         df['parsed_coordinates'] = df['coordinates'].apply(parse_poly)
@@ -282,6 +351,17 @@ def plot_map(df, id, color_by=None, save=None, do_print=True):
         fig.show()
 
 def get_energydata(url: str, params: dict):
+    """
+    Function to fetch data from the Energidata API.
+    
+    Args:
+    - url: The base URL for the API endpoint
+    - params: A dictionary of parameters to include in the API request
+    
+    Returns:
+    - A DataFrame containing the fetched data
+    """
+
     res = requests.get(url=url, params=params)
     data = res.json()
 
@@ -294,12 +374,33 @@ def get_energydata(url: str, params: dict):
     return df
 
 def degrees_to_cardinal(degrees):
+    """
+    Function to convert degrees to cardinal directions.
+
+    Args:
+    - degrees: The angle in degrees to convert.
+
+    Returns:
+    - A string representing the cardinal direction.
+    """
+
     directions = ['N', 'NE',  'E', 'SE', 
                   'S', 'SW', 'W', 'NW']
     idx = round(degrees / 45) % 8
     return directions[idx]
 
 def pca_filtering(df, prefix, n_components=0.99):
+    """
+    Function to perform PCA on columns with a given prefix in a DataFrame.
+
+    Args:
+    - df: The DataFrame containing the data to process.
+    - prefix: The prefix to use for filtering columns.
+    - n_components: The number of components to keep, or the explained variance ratio to retain.
+
+    Returns:
+    - A DataFrame containing the reduced data.
+    """
     pca = PCA(n_components=n_components, svd_solver='full')
     
     data_n = pca.fit_transform(df.filter(like=prefix))
@@ -311,12 +412,34 @@ def pca_filtering(df, prefix, n_components=0.99):
 
 # define function for cyclical encoding
 def cyclical_encoding(df, column, max_val):
+    """
+    Function to perform cyclical encoding of a column in a DataFrame.
+    
+    Args:
+    - df: The DataFrame containing the data to process.
+    - column: The name of the column to encode.
+    - max_val: The maximum value for the cyclical encoding.
+    
+    Returns:
+    - A DataFrame containing the encoded data.
+    """
+
     df[column + '_sin'] = np.sin(2 * np.pi * df[column]/max_val)
     df[column + '_cos'] = np.cos(2 * np.pi * df[column]/max_val)
     df.drop(column, axis=1, inplace=True)
     return df
 
 def cyclical_wind_encoding(df, wind_col):
+    """
+    Function to perform cyclical encoding of wind directions in a DataFrame.
+    
+    Parameters:
+    - df: The DataFrame containing the data to process.
+    - wind_col: The name of the column containing wind directions.
+    
+    Returns:
+    - A DataFrame containing the encoded wind data.
+    """
     if wind_col not in df.columns:
         raise ValueError(f"Column '{wind_col}' not found in the DataFrame.")
     
