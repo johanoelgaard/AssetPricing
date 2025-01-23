@@ -1,4 +1,5 @@
 # Seminar: Asset Pricing and Financial Markets
+University of Copenhagen, Fall 2024
 
 This repository contains the code for reproducing the results of the paper [`Post-2021 Forecasting of Electricity Prices in Western
 Denmark: A Weather-Based Approach`](Seminar_Asset_Prices_and_Financial_Markets.pdf) written by Alon Clausen (smr136@alumni.ku.dk) and Johan Ølgaard (jlh601@alumni.ku.dk) as part of the seminar named Asset Pricing and Financial Markets at the University of Copenhagen.
