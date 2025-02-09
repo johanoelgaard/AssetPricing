@@ -15,4 +15,4 @@ To get from raw data to the final results, the notebooks should be run in the fo
 
 2. [`Modeling`](Modeling) folder
     - [`SARIMA.ipynb`](Modelling/SARIMA.ipynb), [`SARIMAX.ipynb`](Modelling/SARIMAX.ipynb), and [`LSTM.ipynb`](Modelling/LSTMmodel.ipynb) can be run in any order
-    - [`modelevaluation.ipynb`](Modeling/modelevaluation.ipynb)
+    - [`modelevaluation.ipynb`](Modelling/ModelEvaluation.ipynb)
