@@ -13,6 +13,6 @@ To get from raw data to the final results, the notebooks should be run in the fo
     - [`loadbulkweather.ipynb`](PreProcessing/loadbulkweather.ipynb)
     - [`combinedata.ipynb`](PreProcessing/combinedata.ipynb)
 
-2. [`Modeling`](Modeling) folder
+2. [`Modelling`](Modelling) folder
     - [`SARIMA.ipynb`](Modelling/SARIMA.ipynb), [`SARIMAX.ipynb`](Modelling/SARIMAX.ipynb), and [`LSTMmodel.ipynb`](Modelling/LSTMmodel.ipynb) can be run in any order
     - [`ModelEvaluation.ipynb`](Modelling/ModelEvaluation.ipynb)
