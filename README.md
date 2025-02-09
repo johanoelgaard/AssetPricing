@@ -14,5 +14,5 @@ To get from raw data to the final results, the notebooks should be run in the fo
     - [`combinedata.ipynb`](PreProcessing/combinedata.ipynb)
 
 2. [`Modeling`](Modeling) folder
-    - [`SARIMA.ipynb`](Modeling/ARIMA.ipynb), [`SARIMAX.ipynb`](Modeling/LSTM.ipynb), and [`LSTM.ipynb`](Modeling/LSTM.ipynb) can be run in any order
+    - [`SARIMA.ipynb`](Modelling/ARIMA.ipynb), [`SARIMAX.ipynb`](Modelling/LSTM.ipynb), and [`LSTM.ipynb`](Modelling/LSTM.ipynb) can be run in any order
     - [`modelevaluation.ipynb`](Modeling/modelevaluation.ipynb)
