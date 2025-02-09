@@ -6,7 +6,7 @@ Denmark: A Weather-Based Approach`](Seminar_Asset_Prices_and_Financial_Markets.p
 
 The repository is structured as follows:
 - The [`PreProcessing`](PreProcessing) folder contains 2 notebooks for processing the raw data and a .py file for the functions used in the notebooks
-- The [`Modeling`](Modeling) folder contains 4 notebooks for modeling the data. One notebook for each model and a notebook for model comparison. The folder also contains a .py file containing the library of custom functions used in the notebooks
+- The [`Modelling`](Modelling) folder contains 4 notebooks for modeling the data. One notebook for each model and a notebook for model comparison. The folder also contains a .py file containing the library of custom functions used in the notebooks
 
 To get from raw data to the final results, the notebooks should be run in the following order:
 1. [`PreProcessing`](PreProcessing) folder
@@ -14,5 +14,5 @@ To get from raw data to the final results, the notebooks should be run in the fo
     - [`combinedata.ipynb`](PreProcessing/combinedata.ipynb)
 
 2. [`Modeling`](Modeling) folder
-    - [`SARIMA.ipynb`](Modelling/SARIMA.ipynb), [`SARIMAX.ipynb`](Modelling/SARIMAX.ipynb), and [`LSTM.ipynb`](Modelling/LSTMmodel.ipynb) can be run in any order
-    - [`modelevaluation.ipynb`](Modelling/ModelEvaluation.ipynb)
+    - [`SARIMA.ipynb`](Modelling/SARIMA.ipynb), [`SARIMAX.ipynb`](Modelling/SARIMAX.ipynb), and [`LSTMmodel.ipynb`](Modelling/LSTMmodel.ipynb) can be run in any order
+    - [`ModelEvaluation.ipynb`](Modelling/ModelEvaluation.ipynb)
